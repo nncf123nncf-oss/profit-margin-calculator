@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="原価と売価、または目標利益率から利益と売価をその場で計算できるツールです。">
+  <title>利益率計算機</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --background: #D7DFC5;
+      --surface: #FFFFFF;
+      --text: #2E3620;
+      --muted: #5C6B47;
+      --accent: #5E7C3E;
+      --danger: #C0392B;
+      --border: #C3CDA8;
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      margin: 0;
+      background: var(--background);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    .page {
+      width: min(100% - 32px, 560px);
+      margin: 0 auto;
+      padding: 32px 0 40px;
+    }
+
+    .page-header { margin-bottom: 24px; }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.4;
+    }
+
+    .lead {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .tool {
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .field-label,
+    .result-label {
+      display: block;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+
+    input {
+      display: block;
+      width: 100%;
+      min-height: 44px;
+      margin-top: 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-size: 16px;
+      line-height: 1.4;
+    }
+
+    input::placeholder { color: var(--muted); }
+
+    input:focus-visible {
+      outline: 3px solid rgb(94 124 62 / 30%);
+      outline-offset: 2px;
+    }
+
+    .calculation {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .calculation h2 {
+      margin: 0;
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1.4;
+    }
+
+    .calculation-intro {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .error {
+      min-height: 20px;
+      margin: 8px 0 0;
+      color: var(--danger);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .results {
+      margin: 16px 0 0;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: var(--radius);
+      background: #FAFCF7;
+    }
+
+    .results[hidden] { display: none; }
+
+    .result-row + .result-row { margin-top: 16px; }
+
+    .result-value {
+      display: block;
+      margin-top: 4px;
+      color: var(--text);
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.35;
+      white-space: nowrap;
+    }
+
+    .result-value.is-loss { color: var(--danger); }
+
+    @media (max-width: 480px) {
+      .page { padding-top: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="page-header">
+      <h1>利益率計算機</h1>
+      <p class="lead">原価から、今の利益と目標利益率に合う売価を確認できます</p>
+    </header>
+
+    <section class="tool" aria-label="利益率の計算">
+      <label class="field-label" for="cost">原価（円）</label>
+      <input id="cost" type="number" min="0" step="any" inputmode="decimal" placeholder="例: 1,000" aria-describedby="cost-help">
+      <p class="calculation-intro" id="cost-help">原価を入力すると、下の2つの計算に共通で使われます。</p>
+
+      <section class="calculation" aria-labelledby="profit-heading">
+        <h2 id="profit-heading">利益額・利益率を計算</h2>
+        <p class="calculation-intro">売価を入力してください</p>
+        <label class="field-label" for="price">売価（円）</label>
+        <input id="price" type="number" min="0" step="any" inputmode="decimal" placeholder="例: 1,500" aria-describedby="profit-error">
+        <p class="error" id="profit-error" role="alert"></p>
+        <dl class="results" id="profit-results" aria-live="polite" hidden>
+          <div class="result-row">
+            <dt class="result-label">利益額</dt>
+            <dd class="result-value" id="profit-amount">¥0</dd>
+          </div>
+          <div class="result-row">
+            <dt class="result-label">利益率</dt>
+            <dd class="result-value" id="profit-rate">0%</dd>
+          </div>
+          <div class="result-row">
+            <dt class="result-label">原価率</dt>
+            <dd class="result-value" id="cost-rate">0%</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="calculation" aria-labelledby="recommended-heading">
+        <h2 id="recommended-heading">推奨売価を逆算</h2>
+        <p class="calculation-intro">目標の利益率を入力してください</p>
+        <label class="field-label" for="target-rate">目標利益率（%）</label>
+        <input id="target-rate" type="number" min="0" max="100" step="any" inputmode="decimal" placeholder="例: 30" aria-describedby="recommended-error">
+        <p class="error" id="recommended-error" role="alert"></p>
+        <dl class="results" id="recommended-results" aria-live="polite" hidden>
+          <div class="result-row">
+            <dt class="result-label">推奨売価</dt>
+            <dd class="result-value" id="recommended-price">¥0</dd>
+          </div>
+          <div class="result-row">
+            <dt class="result-label">原価率</dt>
+            <dd class="result-value" id="recommended-cost-rate">0%</dd>
+          </div>
+        </dl>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const costInput = document.querySelector('#cost');
+    const priceInput = document.querySelector('#price');
+    const targetRateInput = document.querySelector('#target-rate');
+
+    const profitError = document.querySelector('#profit-error');
+    const recommendedError = document.querySelector('#recommended-error');
+    const profitResults = document.querySelector('#profit-results');
+    const recommendedResults = document.querySelector('#recommended-results');
+    const profitAmount = document.querySelector('#profit-amount');
+    const profitRate = document.querySelector('#profit-rate');
+    const costRate = document.querySelector('#cost-rate');
+    const recommendedPrice = document.querySelector('#recommended-price');
+    const recommendedCostRate = document.querySelector('#recommended-cost-rate');
+
+    function readPositive(input) {
+      if (input.value.trim() === '') return null;
+      const value = Number(input.value);
+      return Number.isFinite(value) && value > 0 ? value : null;
+    }
+
+    function formatNumber(value, maximumFractionDigits = 2) {
+      return new Intl.NumberFormat('ja-JP', { maximumFractionDigits }).format(value);
+    }
+
+    function formatMoney(value) {
+      return `${value < 0 ? '-' : ''}¥${formatNumber(Math.abs(value))}`;
+    }
+
+    function formatPercent(value) {
+      return `${formatNumber(value)}%`;
+    }
+
+    function calculateProfit() {
+      const cost = readPositive(costInput);
+      const price = readPositive(priceInput);
+      profitError.textContent = '';
+      profitResults.hidden = true;
+
+      if (costInput.value.trim() === '') {
+        profitError.textContent = '原価を入力してください。';
+        return;
+      }
+      if (priceInput.value.trim() === '') {
+        profitError.textContent = '売価を入力してください。';
+        return;
+      }
+      if (cost === null) {
+        profitError.textContent = '原価は0より大きい数値を入力してください。';
+        return;
+      }
+      if (price === null) {
+        profitError.textContent = '売価は0より大きい数値を入力してください。';
+        return;
+      }
+
+      const profit = price - cost;
+      const margin = (profit / price) * 100;
+      const ratio = (cost / price) * 100;
+      profitAmount.textContent = formatMoney(profit);
+      profitAmount.classList.toggle('is-loss', profit < 0);
+      profitRate.textContent = formatPercent(margin);
+      costRate.textContent = formatPercent(ratio);
+      profitResults.hidden = false;
+    }
+
+    function calculateRecommendedPrice() {
+      const cost = readPositive(costInput);
+      const targetRate = readPositive(targetRateInput);
+      recommendedError.textContent = '';
+      recommendedResults.hidden = true;
+
+      if (costInput.value.trim() === '') {
+        recommendedError.textContent = '原価を入力してください。';
+        return;
+      }
+      if (targetRateInput.value.trim() === '') {
+        recommendedError.textContent = '目標利益率を入力してください。';
+        return;
+      }
+      if (cost === null) {
+        recommendedError.textContent = '原価は0より大きい数値を入力してください。';
+        return;
+      }
+      if (targetRate === null) {
+        recommendedError.textContent = '目標利益率は0より大きい数値を入力してください。';
+        return;
+      }
+      if (targetRate >= 100) {
+        recommendedError.textContent = '目標利益率は100%未満で入力してください。';
+        return;
+      }
+
+      const price = cost / (1 - targetRate / 100);
+      recommendedPrice.textContent = formatMoney(price);
+      recommendedCostRate.textContent = formatPercent((cost / price) * 100);
+      recommendedResults.hidden = false;
+    }
+
+    function calculateAll() {
+      calculateProfit();
+      calculateRecommendedPrice();
+    }
+
+    [costInput, priceInput, targetRateInput].forEach((input) => {
+      input.addEventListener('input', calculateAll);
+    });
+  </script>
+</body>
+</html>
